@@ -1,44 +1,51 @@
 #include <Arduino.h>
 
 /**
- * 建立基本网络服务器
+ * 建立基本网络服务器 显示 引脚 D3 状态 , 自动刷新
  */
 #include <ESP8266WiFi.h>
 #include <ESP8266WiFiMulti.h>
 #include <ESP8266WebServer.h>
 
+//按钮引脚 D3
+#define buttonPin D3
+
 ESP8266WiFiMulti wifiMulti;
 //建立ESP8266WebServer对象  端口号: 80
 ESP8266WebServer esp8266_server(80);
 
+//存储 引脚状态
+bool pinState = false;
 
-//处理网站根目录“/”的访问请求
-void handleRoot() {
-    esp8266_server.send(200, "text/html",
-                        "<form action=\"/LED\" method=\"POST\"><input type=\"submit\" value=\"Toggle LED\"></form>");
+String sendHTML(bool buttonState) {
+    String html = "<!DOCTYPE html><html><head><meta http-equiv='refresh' content='5'/><meta charset=\"utf-8\"><title>ESP8266</title></head><body>";
+    html += "<h1>ESP8266 Button State Auto Refresh</h1>";
+    html += "<p>按钮状态: ";
+    html += buttonState ? "松开" : "按下";
+    html += "</p>";
+    html += "<p>引脚状态: ";
+    html += buttonState==HIGH ? "高电平" : "低电平";
+    html += "</p>";
+    html += "</body></html>";
+    return html;
 }
 
-// 设置处理404情况
+void handleRoot() {
+    esp8266_server.send(200, "text/html", sendHTML(pinState));
+}
+
+
 void handleNotFound() {
     esp8266_server.send(404, "text/plain", "404: Not Found");
-}
-
-//处理LED控制请求
-void handleLED() {
-    // 改变LED的点亮或者熄灭状态
-    //读取 LED 的状态 取相反值，写入为 LED 的状态
-    digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
-    // 跳转回页面根目录
-    esp8266_server.sendHeader("Location", "/");
-    // 发送303状态码
-    esp8266_server.send(303);
 }
 
 void setup() {
     //启用串口通讯
     Serial.begin(9600);
-    //设置内置LED引脚为输出模式以便控制LED灯
-    pinMode(LED_BUILTIN, OUTPUT);
+    delay(10);
+    Serial.print("");
+    //将 按键引脚D3 设置为 输入上拉模式
+    pinMode(buttonPin, INPUT_PULLUP);
     //使用时 需要连接的WiFi
     wifiMulti.addAP("public void main () {}", "zhangjiaxue");
     wifiMulti.addAP("EU-education", "eu456987");
@@ -57,9 +64,9 @@ void setup() {
     Serial.println("启动网络服务");
 //--------"启动网络服务功能"程序部分开始-------- //
     esp8266_server.begin();
+    //设置服务器根目录即'/'的函数
     esp8266_server.on("/", handleRoot);
-    //设置处理LED控制请求
-    esp8266_server.on("/LED", handleLED);
+    //设置处理404情况的函数
     esp8266_server.onNotFound(handleNotFound);
 //--------"启动网络服务功能"程序部分结束--------
     Serial.print("HTTP esp8266_server started\n");
@@ -67,6 +74,8 @@ void setup() {
 }
 
 void loop() {
-    // 处理http服务器访问
+    //处理 Http 服务器访问
     esp8266_server.handleClient();
+    //获取 引脚 D3 状态
+    pinState = digitalRead(buttonPin);
 }
